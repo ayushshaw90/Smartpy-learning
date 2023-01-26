@@ -40,9 +40,15 @@ class Election(sp.Contract):
 
     @sp.entry_point
     def vote(self, candidate):
+        sp.verify(self.data.election_is_open, "Cannot vote, election is not open")
         sp.verify(~self.data.voted.contains(sp.sender), "Double voting not allowed")
         sp.verify(self.data.candidates_votes.contains(candidate), "This candidate has not filed any nomination")
         self.data.candidates_votes[candidate]+=1
         sp.data.voted.add(sp.sender)
-
+    @sp.entry_point
+    def close_election(self):
+        sp.verify(self.data.election_admin==sp.sender, "Only election admin can close election.")
+        sp.verify(~self.data.nomination_is_open, "Election cannot be closed when nominations are going on.")
+        sp.verify(self.data.election_is_open, "Election is already closed.")
+        self.data.election_is_open=False
         
