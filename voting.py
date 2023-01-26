@@ -7,7 +7,8 @@ class Election(sp.Contract):
             nomination_is_open=False,
             election_admin=sp.sender,
             candidates_votes=sp.map(tkey=sp.TAddress, tvalue=sp.TNat),
-            security_deposit=sp.tez(0)
+            security_deposit=sp.tez(0),
+            voted=sp.set()
         )
     @sp.entry_point
     def set_security_deposit(self, value):
@@ -24,12 +25,24 @@ class Election(sp.Contract):
         self.data.nomination_is_open=True
     
     @sp.entry_point
-    def nominate(self):
-        sp.verify(~self.data.nomination_is_open, "Nominations are cloased")
+    def file_nomination(self):
+        sp.verify(~self.data.nomination_is_open, "Nominations are closed")
         sp.verify(~self.candidates_votes.contains(sp.sender), "Candidate already nominated! Cannot be nominated again.")
-        sp.verify(sp.)
+        sp.verify(sp.amount== security_deposit, "Send correct amount for nomination {}".format(self.data.security_deposit))
+        self.data.candidates_votes[sp.sender]=0
     
     @sp.entry_point
     def start_election(self):
         sp.verify(sp.sender== self.data.election_admin, "Only an admin can start an election")
         sp.verify(~self.data.election_is_open, "Election is already open")
+        self.data.nomination_is_open=False
+        self.data.election_is_open=True
+
+    @sp.entry_point
+    def vote(self, candidate):
+        sp.verify(~self.data.voted.contains(sp.sender), "Double voting not allowed")
+        sp.verify(self.data.candidates_votes.contains(candidate), "This candidate has not filed any nomination")
+        self.data.candidates_votes[candidate]+=1
+        sp.data.voted.add(sp.sender)
+
+        
