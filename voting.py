@@ -1,34 +1,35 @@
 import smartpy as sp
 class Election(sp.Contract):
-    def __init__(self):
+    def __init__(self, admin):
         #this is to conduct an election for 2 candidates
         self.init(
             election_is_open=False,
             nomination_is_open=False,
-            election_admin=sp.sender,
+            election_admin=admin,
             candidates_votes=sp.map(tkey=sp.TAddress, tvalue=sp.TNat),
             security_deposit=sp.tez(0),
             voted=sp.set()
         )
+    
     @sp.entry_point
     def set_security_deposit(self, value):
         sp.verify(sp.sender == self.data.election_admin, "Only election admin can change security deposit amount")
         sp.verify(~self.data.nomination_is_open, "Security deposit amount cannot be changed when nominations are open")
         sp.verify(~self.data.election_is_open, "Security deposit amount cannot be changed when election is open")
-        self.data.security_deposit=sp.tez(value)
+        self.data.security_deposit=sp.utils.nat_to_tez(value)
+    
     @sp.entry_point
     def start_nomination(self):
         sp.verify(self.data.election_admin==sp.sender, "Only admin can allow to start nomination")
         sp.verify(~self.data.nomination_is_open, "Nomination is already open")
         sp.verify(~self.data.election_is_open, "Nomination cannot be started when election is getting conducted")
-        sp.verify(self.data.security_deposit==sp.amo)
         self.data.nomination_is_open=True
     
     @sp.entry_point
     def file_nomination(self):
-        sp.verify(~self.data.nomination_is_open, "Nominations are closed")
-        sp.verify(~self.candidates_votes.contains(sp.sender), "Candidate already nominated! Cannot be nominated again.")
-        sp.verify(sp.amount== security_deposit, "Send correct amount for nomination {}".format(self.data.security_deposit))
+        sp.verify(self.data.nomination_is_open, "Nominations are closed")
+        sp.verify(~self.data.candidates_votes.contains(sp.sender), "Candidate already nominated! Cannot be nominated again.")
+        sp.verify(sp.amount== self.data.security_deposit, "Send correct amount for nomination")
         self.data.candidates_votes[sp.sender]=0
     
     @sp.entry_point
@@ -44,11 +45,27 @@ class Election(sp.Contract):
         sp.verify(~self.data.voted.contains(sp.sender), "Double voting not allowed")
         sp.verify(self.data.candidates_votes.contains(candidate), "This candidate has not filed any nomination")
         self.data.candidates_votes[candidate]+=1
-        sp.data.voted.add(sp.sender)
+        self.data.voted.add(sp.sender)
+    
     @sp.entry_point
     def close_election(self):
         sp.verify(self.data.election_admin==sp.sender, "Only election admin can close election.")
         sp.verify(~self.data.nomination_is_open, "Election cannot be closed when nominations are going on.")
         sp.verify(self.data.election_is_open, "Election is already closed.")
         self.data.election_is_open=False
+
+
+if "templates" not in __name__:
+    @sp.add_test(name="Testing voting")
+    def test():
+        ayush = sp.test_account("Ayush")
+        harry = sp.test_account("Harry")
+        scenario = sp.test_scenario()
+        contract = Election(admin=ayush.address)
+        scenario+=contract
+        scenario+=contract.set_security_deposit(1).run(sender=ayush)
+        scenario+=contract.start_nomination().run(sender=ayush)
+        scenario+=contract.file_nomination().run(sender= harry, amount=sp.tez(1))
+
+        
         
