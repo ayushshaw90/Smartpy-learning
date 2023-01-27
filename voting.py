@@ -56,6 +56,14 @@ class Election(sp.Contract):
         sp.verify(~self.data.nomination_is_open, "Election cannot be closed when nominations are going on.")
         sp.verify(self.data.election_is_open, "Election is already closed.")
         self.data.election_is_open=False
+        sp.for candidate in self.data.candidates_votes.keys():
+            sp.send(candidate, self.data.security_deposit)
+
+    @sp.entry_point
+    def change_admin(self, newadmin):
+        sp.verify(sp.sender==self.data.election_admin, "Only admin can appoint another admin")
+        sp.verify(self.data.election_admin != newadmin, "Previous admin and new admin cannot be same")
+        self.data.election_admin = newadmin
 
 
 if "templates" not in __name__:
@@ -78,3 +86,6 @@ if "templates" not in __name__:
         scenario+=contract.vote(harry.address).run(sender=harry)
         scenario+=contract.vote(subham.address).run(sender=subham)
         scenario+=contract.close_election().run(sender=ayush)
+        scenario.h1("Final state")
+        scenario+=contract.start_nomination().run(sender=ayush)
+        scenario+=contract.change_admin(mohan.address).run(sender=ayush)
