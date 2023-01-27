@@ -24,6 +24,8 @@ class Election(sp.Contract):
         sp.verify(~self.data.nomination_is_open, "Nomination is already open")
         sp.verify(~self.data.election_is_open, "Nomination cannot be started when election is getting conducted")
         self.data.nomination_is_open=True
+        self.data.candidates_votes = sp.map(tkey=sp.TAddress, tvalue=sp.TNat)
+        self.data.voted = sp.set()
     
     @sp.entry_point
     def file_nomination(self):
@@ -36,6 +38,7 @@ class Election(sp.Contract):
     def start_election(self):
         sp.verify(sp.sender== self.data.election_admin, "Only an admin can start an election")
         sp.verify(~self.data.election_is_open, "Election is already open")
+        sp.verify(self.data.nomination_is_open, "Nominations have not been filed yet")
         self.data.nomination_is_open=False
         self.data.election_is_open=True
 
@@ -60,12 +63,18 @@ if "templates" not in __name__:
     def test():
         ayush = sp.test_account("Ayush")
         harry = sp.test_account("Harry")
+        subham = sp.test_account("Subham")
+        mohan = sp.test_account("Mohan")
         scenario = sp.test_scenario()
         contract = Election(admin=ayush.address)
         scenario+=contract
         scenario+=contract.set_security_deposit(1).run(sender=ayush)
         scenario+=contract.start_nomination().run(sender=ayush)
         scenario+=contract.file_nomination().run(sender= harry, amount=sp.tez(1))
-
-        
-        
+        scenario+=contract.file_nomination().run(sender= subham, amount=sp.tez(1))
+        scenario+=contract.start_election().run(sender= ayush)
+        scenario+=contract.vote(harry.address).run(sender=ayush)
+        scenario+=contract.vote(subham.address).run(sender=mohan)
+        scenario+=contract.vote(harry.address).run(sender=harry)
+        scenario+=contract.vote(subham.address).run(sender=subham)
+        scenario+=contract.close_election().run(sender=ayush)
